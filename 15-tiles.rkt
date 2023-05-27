@@ -16,11 +16,13 @@
 
 
 (define (key-handler ws ke)
-  (when (key=? ke " ")
-    (if (false? (world-init? ws))
-        (set-world-init?! ws #t)
-        (new-world)))
-  ws)
+  (cond
+    [(and (key=? ke " ") (false? (world-init? ws)))
+     (set-world-init?! ws #t)
+     ws]                   
+    [(key=? ke " ")
+     (new-world #t)]
+    [else ws]))
 
 (define (mouse-handler ws x y evt)
   (unless (solved? ws) (process-containers CONTAINERS ws x y evt))  
@@ -46,6 +48,39 @@
      (set-world-blank-cname! ws (container-name c))
      (set-world-blank-bname! ws (button-name b))]))
 
+;; 15-tiles Label defaults
+(current-label-border? #t)
+(current-label-font-color 'white)
+(current-label-bg-color 'black)
+(current-label-bo-color 'white)
+(current-label-padding 12)
+
+;; 15-tiles Button defaults
+(current-button-up-action move)
+
+;; 15-tiles Container defaults
+(current-container-button-width 100)
+(current-container-button-height 100)
+
+;; Build the containers list used by clicker functions.
+;; This builds the container, button, and label configuraiton
+;; in a solved state, which is not used except for the basis
+;; of button assignmennt by new-world.
+(define CONTAINERS
+  (for/list ([c (range 4)])
+    (make-container (name c)
+                    (y-offset (* c (current-container-button-height)))
+                    (buttons (for/list ([b (range 4)])
+                               (define lbl-name (modulo (+ (* c 4) (add1 b)) 16))
+                               (make-button (name b)
+                                            (label (if (zero? lbl-name)
+                                                       (make-label
+                                                        (name lbl-name)
+                                                        (font-color 'transparent)
+                                                        (bg-color 'white))
+                                                       (make-label
+                                                    (name lbl-name))))))))))
+
 (define (solvable? ns (acc 0))
   (cond
     [(empty? ns) (even? acc)]
@@ -64,100 +99,52 @@
 ;; left to right, top to bottom.
 (define (solved? ws)
   (define ns
-    (map string->number
-         (drop-right (for*/list ([cname (range 4)]
-                                 [bname (range 4)])
-                       (define c/b (find-container/button cname bname CONTAINERS))
-                       (define b (second c/b))
-                       (label-name (button-label b)))
-                     1)))
+    (drop-right (for*/list ([cname (range 4)]
+                            [bname (range 4)])
+                  (define c/b (find-container/button cname bname CONTAINERS))
+                  (define b (second c/b))
+                  (label-name (button-label b)))
+                1))
   (equal? ns (range 1 16)))
 
-;;;
-;;; Rendering
-;;;
+;; Make a new solvable puzzle, assign to the associated
+;; buttons and reuturn the new world state. 
+(define (new-world (init #f))
+  (define vs (make-solvable-list))
+  (for ([v vs]
+        [n (in-naturals)])
+    [define cname (quotient n 4)]
+    [define bname (modulo n 4)]
+    [define c/b (find-container/button cname bname CONTAINERS)]
+    [unless (false? c/b)
+      (define b (second c/b))      
+      (define lbl (make-label (name v)))
+      (set-button-label! b lbl)])
+  [define c/b (find-container/button 3 3 CONTAINERS)]
+  (define b (second c/b))
+  (define lbl (make-label (name 0) (font-color 'transparent) (bg-color 'white)))
+  (set-button-label! b lbl)  
+  (world init 3 3))
 
-(define FONT-SIZE 40)
-(define FONT-COLOR 'white)
-(define EMPHASIS-COLOR 'gold)
+;;;
+;;; Rendering the puzzle s
+;;;
 
 (define MT-WIDTH  400)
 (define MT-HEIGHT 400)
 (define MT (empty-scene MT-WIDTH MT-HEIGHT 'black))
+
+(define INIT-FONT-SIZE 40)
+(define INIT-FONT-COLOR 'white)
+(define INIT-EMPHASIS-COLOR 'gold)
 (define INIT
   (above/align "left"
-               (text "Press" FONT-SIZE FONT-COLOR)
-               (text "SPACEBAR" FONT-SIZE EMPHASIS-COLOR)
-               (text "to begin" FONT-SIZE FONT-COLOR)
-               (text "a new game." FONT-SIZE FONT-COLOR)))
+               (text "Press" INIT-FONT-SIZE INIT-FONT-COLOR)
+               (text "SPACEBAR" INIT-FONT-SIZE INIT-EMPHASIS-COLOR)
+               (text "to begin" INIT-FONT-SIZE INIT-FONT-COLOR)
+               (text "a new game." INIT-FONT-SIZE INIT-EMPHASIS-COLOR)))
 
-(define btn-w 100)
-(define btn-h 100)
-
-(define LABEL-PAD 8)
-
-(define (make-label n)
-  (define FONT-COLOR 'white)
-  (define BG-COLOR 'black)
-  (define BO-COLOR 'white)
-  (define BLANK-FONT-COLOR 'transparent)
-  (define BLANK-BG-COLOR  'white)
-  (define BLANK-BO-COLOR 'white)
-  (cond
-    [(zero? n)
-     (label " " #t #f BLANK-FONT-COLOR BLANK-BG-COLOR BLANK-BG-COLOR LABEL-PAD)]
-    [else
-     (label (~a n) #t #f FONT-COLOR BG-COLOR BO-COLOR LABEL-PAD)]))
-
-(define (make-button btn-name lbl-name)
-  (button btn-name
-          #t
-          (make-label lbl-name)
-          move))
-
-(define (make-container ctn-name . btns)
-  (container ctn-name
-             #t
-             0
-             (* ctn-name btn-h)
-             'transparent
-             #f
-             #f
-             #f
-             #f
-             #f
-             0
-             0
-             btn-w
-             btn-h
-             #f
-             #f
-             #f
-             btns))
-
-(define CONTAINERS
-  (list
-   (make-container 0
-                   (make-button 0 1)
-                   (make-button 1 2)
-                   (make-button 2 3)
-                   (make-button 3 4))
-   (make-container 1
-                   (make-button 0 5)
-                   (make-button 1 6)
-                   (make-button 2 7)
-                   (make-button 3 8))
-   (make-container 2
-                   (make-button 0 9)
-                   (make-button 1 10)
-                   (make-button 2 11)
-                   (make-button 3 12))
-   (make-container 3
-                   (make-button 0 13)
-                   (make-button 1 14)
-                   (make-button 2 15)
-                   (make-button 3 0))))
-
+;; Shows the puzzle in 1 of 3 states: instructions, unsolved, and solved.
 (define (render ws)
   (cond
     [(false? (world-init? ws))
@@ -166,16 +153,19 @@
      (render-solved! ws)]
     [else (render-unsolved ws)]))
 
+;; Show the puzzle instructions.
 (define (render-init ws)
   (place-image INIT
                (quotient MT-WIDTH 2)
                (quotient MT-HEIGHT 2)
                MT))
 
+;; Show the unsolved puzzle state.
 (define (render-unsolved ws)
   (place-containers CONTAINERS
                     MT))
 
+;; Show the solved puzzle. 
 (define (render-solved! ws)
   (define img (text "SOLVED!" 80 'darkred))
   (define win-img (rotate 45 (overlay img
@@ -185,19 +175,6 @@
   (overlay
    win-img
    (render-unsolved ws)))
-
-(define (new-world)
-  (define vs (make-solvable-list))
-  (for ([v vs]
-        [n (in-naturals)])
-    [define cname (quotient n 4)]
-    [define bname (modulo n 4)]
-    [define c/b (find-container/button cname bname CONTAINERS)]
-    [unless (false? c/b)
-      (define b (second c/b))
-      (define lbl (label (~a v) #t #f 'white 'black 'white LABEL-PAD))
-      (set-button-label! b lbl)])
-  (world #f 3 3))
 
 (big-bang (new-world)
   (on-mouse mouse-handler)
