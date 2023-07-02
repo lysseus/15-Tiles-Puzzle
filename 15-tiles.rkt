@@ -10,6 +10,7 @@
 
 (require 2htdp/universe
          2htdp/image
+         utils/struct
          utils/2htdp/clicker)
 
 (struct world (inst-seen? blank-cname blank-bname containers) #:mutable #:transparent)
@@ -68,9 +69,10 @@
   (unless (solved? ws) (process-containers (world-containers ws) ws x y evt))  
   ws)
 
-(define (move c b ws x-pos y-pos)
-  (define cname (container-name c))
-  (define bname (button-name b))
+(define (move)
+  (define-from-struct clicker-evt (current-clicker-evt)  ctn btn ws)
+  (define cname (container-name ctn))
+  (define bname (button-name btn))
   (define blank-cname (world-blank-cname ws))
   (define blank-bname (world-blank-bname ws))
   (define lst (find-container/button blank-cname blank-bname (world-containers ws)))
@@ -83,10 +85,10 @@
     [else
      (define blank-btn (second lst))
      (define blank-label (button-label blank-btn))
-     (set-button-label! blank-btn (button-label b))
-     (set-button-label!  b blank-label)
-     (set-world-blank-cname! ws (container-name c))
-     (set-world-blank-bname! ws (button-name b))]))
+     (set-button-label! blank-btn (button-label btn))
+     (set-button-label!  btn blank-label)
+     (set-world-blank-cname! ws (container-name ctn))
+     (set-world-blank-bname! ws (button-name btn))]))
 
 ;; 15-tiles Label defaults
 (current-label-border? #t)
